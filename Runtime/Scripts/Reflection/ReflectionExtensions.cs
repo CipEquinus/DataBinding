@@ -57,13 +57,29 @@ namespace JH.DataBinding
         throw new ArgumentNullException(nameof(instance));
       }
 
+      return ResolvePublicPropertyPathForType(reflectionOperations, instance.GetType(), path, operation);
+    }
+
+    internal static MethodInfo[] ResolvePublicPropertyPathForType<T>(
+      T reflectionOperations,
+      Type type,
+      string path,
+      PathResolveOperation operation
+    )
+      where T : struct, IReflectionOperations
+    {
+      if (type == null)
+      {
+        throw new ArgumentNullException(nameof(type));
+      }
+
       if (path == null)
       {
         throw new ArgumentNullException(nameof(path));
       }
 
       var pathFragments = path.Split('.');
-      var fragmentInstanceType = instance.GetType();
+      var fragmentInstanceType = type;
       var accessors = new MethodInfo[pathFragments.Length];
 
       for (var i = 0; i < pathFragments.Length - 1; ++i)

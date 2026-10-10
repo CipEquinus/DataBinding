@@ -26,6 +26,21 @@ namespace JH.DataBinding
 
     private MethodInfo[] dataSourcePropertyAccessors = Array.Empty<MethodInfo>();
     private MethodInfo[] targetPropertyAccessors = Array.Empty<MethodInfo>();
+    private bool targetAccessorsPrepared;
+    private Action configurationChanged;
+
+    internal void ObserveConfiguration(Action onConfigurationChanged) =>
+      configurationChanged = onConfigurationChanged;
+
+    internal void SetPreparedDataSource(object source) => dataSource = source;
+
+    internal void BindPrepared(object source, MethodInfo[] sourceAccessors, MethodInfo[] targetAccessors)
+    {
+      dataSource = source;
+      dataSourcePropertyAccessors = sourceAccessors;
+      targetPropertyAccessors = targetAccessors;
+      targetAccessorsPrepared = true;
+    }
 
     public object DataSource
     {
@@ -49,6 +64,7 @@ namespace JH.DataBinding
         if (sourcePath != value)
         {
           sourcePath = value;
+          configurationChanged?.Invoke();
 
           BindSource();
         }
@@ -64,6 +80,7 @@ namespace JH.DataBinding
         {
           targetGameObject = value;
           targetComponent = null;
+          configurationChanged?.Invoke();
 
           BindTarget();
         }
@@ -77,7 +94,8 @@ namespace JH.DataBinding
         if (targetComponent != value)
         {
           targetComponent = value;
-          targetGameObject = value.gameObject;
+          targetGameObject = value != null ? value.gameObject : null;
+          configurationChanged?.Invoke();
 
           BindTarget();
         }
@@ -92,6 +110,7 @@ namespace JH.DataBinding
         if (targetPath != value)
         {
           targetPath = value;
+          configurationChanged?.Invoke();
 
           BindTarget();
         }
@@ -113,6 +132,7 @@ namespace JH.DataBinding
 
     private void BindTarget()
     {
+      targetAccessorsPrepared = false;
       if (targetComponent != null && !String.IsNullOrEmpty(targetPath))
       {
         targetPropertyAccessors = RuntimeReflectionOperations.Instance
@@ -131,7 +151,7 @@ namespace JH.DataBinding
         return;
       }
 
-      if (targetPropertyAccessors.Length == 0)
+      if (targetPropertyAccessors.Length == 0 && !targetAccessorsPrepared)
       {
         BindTarget();
       }

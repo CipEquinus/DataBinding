@@ -22,6 +22,21 @@ namespace JH.DataBinding
     private object dataSource;
 
     private MethodInfo[] dataSourcePropertyAccessors;
+    private Action configurationChanged;
+    private ViewBindingPlans elementBindingPlans;
+    private ViewBindingPlan elementBindingPlan;
+    private Type elementSourceType;
+
+    internal void ObserveConfiguration(Action onConfigurationChanged) =>
+      configurationChanged = onConfigurationChanged;
+
+    internal void SetPreparedDataSource(object source) => dataSource = source;
+
+    internal void BindPrepared(object source, MethodInfo[] sourceAccessors)
+    {
+      dataSource = source;
+      dataSourcePropertyAccessors = sourceAccessors;
+    }
 
     public object DataSource
     {
@@ -38,7 +53,13 @@ namespace JH.DataBinding
       get => sourcePath;
       set
       {
+        if (sourcePath == value)
+        {
+          return;
+        }
+
         sourcePath = value;
+        configurationChanged?.Invoke();
         BindSource();
       }
     }
@@ -52,7 +73,14 @@ namespace JH.DataBinding
     public View ElementTemplate
     {
       get => elementTemplate;
-      set => elementTemplate = value;
+      set
+      {
+        if (elementTemplate != value)
+        {
+          elementTemplate = value;
+          configurationChanged?.Invoke();
+        }
+      }
     }
 
     private void BindSource()
@@ -82,6 +110,11 @@ namespace JH.DataBinding
           return;
         }
 
+        if (dataSourcePropertyAccessors.Length == 0)
+        {
+          return;
+        }
+
         var boundInstances = (
           (
             RuntimeReflectionOperations.Instance.InvokeGetAccessChain(dataSourcePropertyAccessors, dataSource)
@@ -89,23 +122,45 @@ namespace JH.DataBinding
           ) ?? Array.Empty<INotifyDataSourceChanged>()
         ).ToArray();
 
-        AddMissingChildren(boundInstances.Length);
+        if (boundInstances.Length == 0)
+        {
+          RemoveSuperfluousChildren(0);
+          return;
+        }
+
+        var plans = ElementTemplate.PrepareBindingPlans();
+        if (plans != elementBindingPlans)
+        {
+          elementBindingPlans = plans;
+          elementBindingPlan = null;
+        }
+
+        AddMissingChildren(boundInstances.Length, plans);
         RemoveSuperfluousChildren(boundInstances.Length);
 
         for (var childIndex = 0; childIndex < boundInstances.Length; childIndex++)
         {
           // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
           var view = TargetContainer.GetChild(childIndex).GetComponent<View>();
-          view.DataSource = boundInstances[childIndex];
+          var source = boundInstances[childIndex];
+          var sourceType = source?.GetType();
+          if (elementBindingPlan == null || sourceType != elementSourceType)
+          {
+            elementBindingPlan = plans.ForSource(source);
+            elementSourceType = sourceType;
+          }
+
+          view.SetDataSource(source, elementBindingPlan);
         }
       }
     }
 
-    private void AddMissingChildren(int numberOfRequiredChildren)
+    private void AddMissingChildren(int numberOfRequiredChildren, ViewBindingPlans plans)
     {
       while (TargetContainer.childCount < numberOfRequiredChildren)
       {
-        UnityEngine.Object.Instantiate(ElementTemplate, TargetContainer);
+        var view = UnityEngine.Object.Instantiate(ElementTemplate, TargetContainer);
+        view.AttachTemplateBindingPlans(ElementTemplate, plans);
       }
     }
 
