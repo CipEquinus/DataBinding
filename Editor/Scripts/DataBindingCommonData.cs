@@ -5,11 +5,15 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
+using EditorReflectionImplementation = JH.DataBinding.DirectReflectionOperations;
 
 namespace JH.DataBinding.Editor
 {
     internal static class DataBindingCommonData
     {
+        // Change the alias above to select the editor implementation without boxing.
+        internal static readonly EditorReflectionImplementation ReflectionOperations = EditorReflectionImplementation.Instance;
+
         public static string DefaultDataSourceTemplateNamePlaceHolder => "{{name}}";
         public static string DefaultDataSourceTemplate =>
             File.ReadAllText(
@@ -29,13 +33,13 @@ namespace JH.DataBinding.Editor
                 !x.IsAbstract
                 && !x.IsGenericType
                 && !x.IsInterface
-                && x.InheritsOrImplements(typeof(INotifyDataSourceChanged));
+                && ReflectionOperations.InheritsOrImplements(x, typeof(INotifyDataSourceChanged));
 
             return assemblies
                 .Where(x => !x.IsDynamic)
                 .SelectMany(x => x.ExportedTypes)
                 .Where(DataSourceFilterFunc)
-                .OrderBy(x => x.GetFriendlyName())
+                .OrderBy(x => ReflectionOperations.GetFriendlyName(x))
                 .ToArray();
         }
 

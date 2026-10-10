@@ -6,6 +6,8 @@ namespace JH.DataBinding
 {
   public readonly struct DirectReflectionOperations : IReflectionOperations
   {
+    public static readonly DirectReflectionOperations Instance = new();
+
     public PropertyInfo FindProperty(Type type, string name)
     {
       return type.FindProperty(name);

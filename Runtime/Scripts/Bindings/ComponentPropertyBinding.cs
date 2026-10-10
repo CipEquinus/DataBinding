@@ -103,8 +103,8 @@ namespace JH.DataBinding
     {
       if (dataSource != null && !String.IsNullOrEmpty(sourcePath))
       {
-        dataSourcePropertyAccessors = dataSource
-          .ResolvePublicPropertyPath(SourcePath, PathResolveOperation.GetValue)
+        dataSourcePropertyAccessors = RuntimeReflectionOperations.Instance
+          .ResolvePublicPropertyPath(dataSource, SourcePath, PathResolveOperation.GetValue)
           .ToArray();
       }
       else
@@ -117,8 +117,8 @@ namespace JH.DataBinding
     {
       if (targetComponent != null && !String.IsNullOrEmpty(targetPath))
       {
-        targetPropertyAccessors = targetComponent
-          .ResolvePublicPropertyPath(targetPath, PathResolveOperation.SetValue)
+        targetPropertyAccessors = RuntimeReflectionOperations.Instance
+          .ResolvePublicPropertyPath(targetComponent, targetPath, PathResolveOperation.SetValue)
           .ToArray();
       }
       else
@@ -144,8 +144,13 @@ namespace JH.DataBinding
         return;
       }
 
-      var value = dataSourcePropertyAccessors.InvokeGetAccessChain(dataSource);
-      targetPropertyAccessors.InvokeSetAccessChain(targetComponent, value);
+      IReflectionOperations.SyncValue(
+        RuntimeReflectionOperations.Instance,
+        dataSource,
+        targetComponent,
+        dataSourcePropertyAccessors,
+        targetPropertyAccessors
+      );
     }
   }
 }

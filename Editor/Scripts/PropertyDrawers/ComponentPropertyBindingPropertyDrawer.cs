@@ -79,9 +79,9 @@ namespace JH.DataBinding.Editor
                         x.Name == binding.SourcePath
                     );
 
-                    var friendlySourceTypeName = sourceProperty
-                        .PropertyType.GetTypeInfo()
-                        .GetFriendlyName();
+                    var friendlySourceTypeName = DataBindingCommonData.ReflectionOperations.GetFriendlyName(
+                        sourceProperty.PropertyType.GetTypeInfo()
+                    );
 
                     var condensedLabelString = string.Format(
                         displayText.ComponentPropertyBindingCondensedLabelFormat_Type_Source_Target_Component,

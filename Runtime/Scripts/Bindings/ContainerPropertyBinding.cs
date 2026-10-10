@@ -59,8 +59,8 @@ namespace JH.DataBinding
     {
       if (dataSource != null && !String.IsNullOrEmpty(sourcePath))
       {
-        dataSourcePropertyAccessors = dataSource
-          .ResolvePublicPropertyPath(SourcePath, PathResolveOperation.GetValue)
+        dataSourcePropertyAccessors = RuntimeReflectionOperations.Instance
+          .ResolvePublicPropertyPath(dataSource, SourcePath, PathResolveOperation.GetValue)
           .ToArray();
       }
       else
@@ -85,7 +85,7 @@ namespace JH.DataBinding
 
         var boundInstances = (
           (
-            dataSourcePropertyAccessors.InvokeGetAccessChain(dataSource)
+            RuntimeReflectionOperations.Instance.InvokeGetAccessChain(dataSourcePropertyAccessors, dataSource)
             as IEnumerable<INotifyDataSourceChanged>
           ) ?? Array.Empty<INotifyDataSourceChanged>()
         ).ToArray();

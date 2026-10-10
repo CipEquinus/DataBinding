@@ -38,7 +38,7 @@ namespace JH.DataBinding.Editor
 
       var filteredDataSources = validDataSources
         .Where(x =>
-          x.GetFriendlyName()
+          DataBindingCommonData.ReflectionOperations.GetFriendlyName(x)
             .IndexOf(
               DataBindingCommonData.dataSourceTypeInspectorFilter,
               StringComparison.OrdinalIgnoreCase
@@ -112,7 +112,7 @@ namespace JH.DataBinding.Editor
           var filteredDataSources = DataBindingCommonData
             .GetValidDataSourceTypes()
             .Where(x =>
-              x.GetFriendlyName()
+              DataBindingCommonData.ReflectionOperations.GetFriendlyName(x)
                 .IndexOf(
                   DataBindingCommonData.dataSourceTypeInspectorFilter,
                   StringComparison.OrdinalIgnoreCase
@@ -168,10 +168,10 @@ namespace JH.DataBinding.Editor
       var selectionSection = new VisualElement();
       selectionSection.AddToClassList(DataBindingEditorStyle.dataSourceSelectionSelectionSection);
 
-      var choices = validDataSources.Select(x => x.GetFriendlyName()).ToList();
+      var choices = validDataSources.Select(x => DataBindingCommonData.ReflectionOperations.GetFriendlyName(x)).ToList();
 
       var view = property.serializedObject.targetObject as View;
-      var currentValue = view.dataSourceType.Type.GetFriendlyName();
+      var currentValue = DataBindingCommonData.ReflectionOperations.GetFriendlyName(view.dataSourceType.Type);
       var filterConditionedDefault = choices.Contains(currentValue)
         ? currentValue
         : choices.FirstOrDefault();
@@ -190,7 +190,7 @@ namespace JH.DataBinding.Editor
       dataSourceDropDown.RegisterValueChangedCallback(changeEvent =>
       {
         var newDataSourceType = validDataSources.FirstOrDefault(x =>
-          x.GetFriendlyName() == changeEvent.newValue
+          DataBindingCommonData.ReflectionOperations.GetFriendlyName(x) == changeEvent.newValue
         );
 
         if (newDataSourceType != null)
