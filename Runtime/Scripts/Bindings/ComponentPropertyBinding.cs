@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
@@ -104,8 +103,7 @@ namespace JH.DataBinding
       if (dataSource != null && !String.IsNullOrEmpty(sourcePath))
       {
         dataSourcePropertyAccessors = RuntimeReflectionOperations.Instance
-          .ResolvePublicPropertyPath(dataSource, SourcePath, PathResolveOperation.GetValue)
-          .ToArray();
+          .ResolvePublicPropertyPath(dataSource, SourcePath, PathResolveOperation.GetValue);
       }
       else
       {
@@ -118,8 +116,7 @@ namespace JH.DataBinding
       if (targetComponent != null && !String.IsNullOrEmpty(targetPath))
       {
         targetPropertyAccessors = RuntimeReflectionOperations.Instance
-          .ResolvePublicPropertyPath(targetComponent, targetPath, PathResolveOperation.SetValue)
-          .ToArray();
+          .ResolvePublicPropertyPath(targetComponent, targetPath, PathResolveOperation.SetValue);
       }
       else
       {

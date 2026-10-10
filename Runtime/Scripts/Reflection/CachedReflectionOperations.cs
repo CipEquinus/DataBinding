@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Reflection;
 
 namespace JH.DataBinding
@@ -15,24 +14,27 @@ namespace JH.DataBinding
     public static readonly CachedReflectionOperations Instance = new CachedReflectionOperations(Init.Init);
 
     private readonly DirectReflectionOperations reflectionOperations;
-    private readonly ConcurrentDictionary<(Type, string), PropertyInfo> propertyCache;
+    private readonly ConcurrentDictionary<(Type, string), PropertyInfo> propertyNameCache;
+    private readonly ConcurrentDictionary<(Type, string, PathResolveOperation), MethodInfo[]> propertyPathCache;
     private readonly ConcurrentDictionary<(Type, Type), bool> inheritanceCache;
     private readonly ConcurrentDictionary<Type, string> nameCache;
 
     private CachedReflectionOperations(Init _)
     {
       reflectionOperations = new();
-      propertyCache = new();
+      propertyNameCache = new();
+      propertyPathCache = new();
       inheritanceCache = new();
       nameCache = new();
     }
 
     public PropertyInfo FindProperty(Type type, string name)
     {
-      if (!propertyCache.TryGetValue((type, name), out var propertyInfo))
+      (Type, string) key = (type, name);
+      if (!propertyNameCache.TryGetValue(key, out var propertyInfo))
       {
         propertyInfo = reflectionOperations.FindProperty(type, name);
-        propertyCache[(type, name)] = propertyInfo;
+        propertyNameCache[key] = propertyInfo;
       }
 
       return propertyInfo;
@@ -59,9 +61,26 @@ namespace JH.DataBinding
       return name;
     }
 
-    public IEnumerable<MethodInfo> ResolvePublicPropertyPath(object instance, string path, PathResolveOperation operation)
+    public MethodInfo[] ResolvePublicPropertyPath(object instance, string path, PathResolveOperation operation)
     {
-      return ReflectionExtensions.ResolvePublicPropertyPath(this, instance, path, operation);
+      if (instance == null)
+      {
+        throw new ArgumentNullException(nameof(instance));
+      }
+
+      if (path == null)
+      {
+        throw new ArgumentNullException(nameof(path));
+      }
+
+      (Type, string, PathResolveOperation) key = (instance.GetType(), path, operation);
+      if (!propertyPathCache.TryGetValue(key, out var accessors))
+      {
+        accessors = ReflectionExtensions.ResolvePublicPropertyPath(this, instance, path, operation);
+        propertyPathCache[key] = accessors;
+      }
+
+      return accessors;
     }
 
     public object InvokeGetAccessChain(MethodInfo[] accessors, object instance)
@@ -76,10 +95,11 @@ namespace JH.DataBinding
 
     public bool InheritsOrImplements(Type type, Type baseType)
     {
-      if (!inheritanceCache.TryGetValue((type, baseType), out var inheritsOrImplements))
+      (Type, Type) key = (type, baseType);
+      if (!inheritanceCache.TryGetValue(key, out var inheritsOrImplements))
       {
         inheritsOrImplements = reflectionOperations.InheritsOrImplements(type, baseType);
-        inheritanceCache[(type, baseType)] = inheritsOrImplements;
+        inheritanceCache[key] = inheritsOrImplements;
       }
 
       return inheritsOrImplements;

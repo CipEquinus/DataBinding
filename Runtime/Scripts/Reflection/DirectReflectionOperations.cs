@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
@@ -54,7 +53,7 @@ namespace JH.DataBinding
       return ReflectionExtensions.GetFriendlyName(this, type);
     }
 
-    public IEnumerable<MethodInfo> ResolvePublicPropertyPath(
+    public MethodInfo[] ResolvePublicPropertyPath(
       object instance,
       string path,
       PathResolveOperation operation

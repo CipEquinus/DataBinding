@@ -60,8 +60,7 @@ namespace JH.DataBinding
       if (dataSource != null && !String.IsNullOrEmpty(sourcePath))
       {
         dataSourcePropertyAccessors = RuntimeReflectionOperations.Instance
-          .ResolvePublicPropertyPath(dataSource, SourcePath, PathResolveOperation.GetValue)
-          .ToArray();
+          .ResolvePublicPropertyPath(dataSource, SourcePath, PathResolveOperation.GetValue);
       }
       else
       {

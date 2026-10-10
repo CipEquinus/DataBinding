@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 
 namespace JH.DataBinding
@@ -45,7 +44,7 @@ namespace JH.DataBinding
       return friendlyName;
     }
 
-    public static IEnumerable<MethodInfo> ResolvePublicPropertyPath<T>(
+    public static MethodInfo[] ResolvePublicPropertyPath<T>(
       this T reflectionOperations,
       object instance,
       string path,
@@ -65,16 +64,16 @@ namespace JH.DataBinding
 
       var pathFragments = path.Split('.');
       var fragmentInstanceType = instance.GetType();
+      var accessors = new MethodInfo[pathFragments.Length];
 
-      foreach (var fragmentPath in pathFragments.Take(pathFragments.Length - 1))
+      for (var i = 0; i < pathFragments.Length - 1; ++i)
       {
-        var currentPathPropertyInfo = reflectionOperations.FindProperty(fragmentInstanceType, fragmentPath);
+        var currentPathPropertyInfo = reflectionOperations.FindProperty(fragmentInstanceType, pathFragments[i]);
         fragmentInstanceType = currentPathPropertyInfo.PropertyType;
-
-        yield return currentPathPropertyInfo.GetMethod;
+        accessors[i] = currentPathPropertyInfo.GetMethod;
       }
 
-      var finalFragment = pathFragments.Last();
+      var finalFragment = pathFragments[^1];
       var propertyInfo = reflectionOperations.FindProperty(fragmentInstanceType, finalFragment);
 
       if (propertyInfo == null)
@@ -82,15 +81,17 @@ namespace JH.DataBinding
         throw new InvalidOperationException($"Failed to resolve property path {path}.");
       }
 
-      switch (operation)
+      // previously if neither case matched the operation, no final MethodInfo was yielded
+      // so we now throw explicitly instead of continuing with some unexpected state
+      // this always means theres a bug in one of the calls not passing one of the expected PathResolveOperations
+      accessors[^1] = operation switch
       {
-        case PathResolveOperation.GetValue:
-          yield return propertyInfo.GetMethod;
-          break;
-        case PathResolveOperation.SetValue:
-          yield return propertyInfo.SetMethod;
-          break;
-      }
+        PathResolveOperation.GetValue => propertyInfo.GetMethod,
+        PathResolveOperation.SetValue => propertyInfo.SetMethod,
+        _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unknown path resolution operation."),
+      };
+
+      return accessors;
     }
 
     private static readonly Dictionary<Type, string> TypeAliases = new()

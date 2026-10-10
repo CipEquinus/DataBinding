@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Reflection;
 
 namespace JH.DataBinding
@@ -18,7 +17,7 @@ namespace JH.DataBinding
 
     string GetFriendlyName(Type type);
 
-    IEnumerable<MethodInfo> ResolvePublicPropertyPath(
+    MethodInfo[] ResolvePublicPropertyPath(
       object instance,
       string path,
       PathResolveOperation operation
