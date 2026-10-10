@@ -62,6 +62,12 @@ namespace JH.DataBinding
       return ReflectionExtensions.ResolvePublicPropertyPath(this, instance, path, operation);
     }
 
+    public PropertyAccessorChain ResolvePropertyAccessors(
+      object instance, string path, PathResolveOperation operation)
+    {
+      return new PropertyAccessorChain(ResolvePublicPropertyPath(instance, path, operation), operation);
+    }
+
     public void SyncValue(
       object source,
       object target,

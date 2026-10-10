@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using UnityEngine;
 
 namespace JH.DataBinding
@@ -24,8 +23,9 @@ namespace JH.DataBinding
 
     private object dataSource;
 
-    private MethodInfo[] dataSourcePropertyAccessors = Array.Empty<MethodInfo>();
-    private MethodInfo[] targetPropertyAccessors = Array.Empty<MethodInfo>();
+    private PropertyAccessorChain dataSourcePropertyAccessors = PropertyAccessorChain.Empty;
+    private PropertyAccessorChain targetPropertyAccessors = PropertyAccessorChain.Empty;
+    private Action<object, object> transferValue;
 
     public object DataSource
     {
@@ -103,12 +103,14 @@ namespace JH.DataBinding
       if (dataSource != null && !String.IsNullOrEmpty(sourcePath))
       {
         dataSourcePropertyAccessors = RuntimeReflectionOperations.Instance
-          .ResolvePublicPropertyPath(dataSource, SourcePath, PathResolveOperation.GetValue);
+          .ResolvePropertyAccessors(dataSource, SourcePath, PathResolveOperation.GetValue);
       }
       else
       {
-        dataSourcePropertyAccessors = Array.Empty<MethodInfo>();
+        dataSourcePropertyAccessors = PropertyAccessorChain.Empty;
       }
+
+      BindTransfer();
     }
 
     private void BindTarget()
@@ -116,12 +118,21 @@ namespace JH.DataBinding
       if (targetComponent != null && !String.IsNullOrEmpty(targetPath))
       {
         targetPropertyAccessors = RuntimeReflectionOperations.Instance
-          .ResolvePublicPropertyPath(targetComponent, targetPath, PathResolveOperation.SetValue);
+          .ResolvePropertyAccessors(targetComponent, targetPath, PathResolveOperation.SetValue);
       }
       else
       {
-        targetPropertyAccessors = Array.Empty<MethodInfo>();
+        targetPropertyAccessors = PropertyAccessorChain.Empty;
       }
+
+      BindTransfer();
+    }
+
+    private void BindTransfer()
+    {
+      transferValue = dataSourcePropertyAccessors.Length > 0 && targetPropertyAccessors.Length > 0
+        ? dataSourcePropertyAccessors.GetTransferTo(targetPropertyAccessors)
+        : null;
     }
 
     public void UpdateBinding()
@@ -141,13 +152,7 @@ namespace JH.DataBinding
         return;
       }
 
-      IReflectionOperations.SyncValue(
-        RuntimeReflectionOperations.Instance,
-        dataSource,
-        targetComponent,
-        dataSourcePropertyAccessors,
-        targetPropertyAccessors
-      );
+      transferValue(dataSource, targetComponent);
     }
   }
 }

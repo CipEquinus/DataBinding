@@ -16,6 +16,8 @@ namespace JH.DataBinding
     private readonly DirectReflectionOperations reflectionOperations;
     private readonly ConcurrentDictionary<(Type, string), PropertyInfo> propertyNameCache;
     private readonly ConcurrentDictionary<(Type, string, PathResolveOperation), MethodInfo[]> propertyPathCache;
+    private readonly ConcurrentDictionary<
+      (Type, string, PathResolveOperation), PropertyAccessorChain> executablePathCache;
     private readonly ConcurrentDictionary<(Type, Type), bool> inheritanceCache;
     private readonly ConcurrentDictionary<Type, string> nameCache;
 
@@ -24,6 +26,7 @@ namespace JH.DataBinding
       reflectionOperations = new();
       propertyNameCache = new();
       propertyPathCache = new();
+      executablePathCache = new();
       inheritanceCache = new();
       nameCache = new();
     }
@@ -81,6 +84,21 @@ namespace JH.DataBinding
       }
 
       return accessors;
+    }
+
+    public PropertyAccessorChain ResolvePropertyAccessors(
+      object instance, string path, PathResolveOperation operation)
+    {
+      if (instance == null) throw new ArgumentNullException(nameof(instance));
+      if (path == null) throw new ArgumentNullException(nameof(path));
+      var key = (instance.GetType(), path, operation);
+      if (!executablePathCache.TryGetValue(key, out var chain))
+      {
+        chain = new PropertyAccessorChain(ResolvePublicPropertyPath(instance, path, operation), operation);
+        chain = executablePathCache.GetOrAdd(key, chain);
+      }
+
+      return chain;
     }
 
     public object InvokeGetAccessChain(MethodInfo[] accessors, object instance)

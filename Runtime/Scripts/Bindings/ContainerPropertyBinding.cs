@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using UnityEngine;
 
 namespace JH.DataBinding
@@ -21,7 +20,7 @@ namespace JH.DataBinding
 
     private object dataSource;
 
-    private MethodInfo[] dataSourcePropertyAccessors;
+    private PropertyAccessorChain dataSourcePropertyAccessors;
 
     public object DataSource
     {
@@ -60,11 +59,11 @@ namespace JH.DataBinding
       if (dataSource != null && !String.IsNullOrEmpty(sourcePath))
       {
         dataSourcePropertyAccessors = RuntimeReflectionOperations.Instance
-          .ResolvePublicPropertyPath(dataSource, SourcePath, PathResolveOperation.GetValue);
+          .ResolvePropertyAccessors(dataSource, SourcePath, PathResolveOperation.GetValue);
       }
       else
       {
-        dataSourcePropertyAccessors = Array.Empty<MethodInfo>();
+        dataSourcePropertyAccessors = PropertyAccessorChain.Empty;
       }
     }
 
@@ -84,7 +83,7 @@ namespace JH.DataBinding
 
         var boundInstances = (
           (
-            RuntimeReflectionOperations.Instance.InvokeGetAccessChain(dataSourcePropertyAccessors, dataSource)
+            dataSourcePropertyAccessors.GetValue(dataSource)
             as IEnumerable<INotifyDataSourceChanged>
           ) ?? Array.Empty<INotifyDataSourceChanged>()
         ).ToArray();
