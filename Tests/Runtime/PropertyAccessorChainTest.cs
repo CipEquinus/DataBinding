@@ -56,6 +56,248 @@ namespace JH.DataBinding.Tests
     {
       public Vector3 Position { get; set; }
       public Vector3 OtherPosition { get; set; }
+      public INotifyDataSourceChanged[] Children { get; set; } = Array.Empty<INotifyDataSourceChanged>();
+    }
+
+    private class DerivedViewModel : ViewModel
+    {
+      public new Vector3 Position { get; set; }
+    }
+
+    private static object PrivateField(object instance, string name) =>
+      instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
+        .GetValue(instance);
+
+    private static View CreatePlannedView(string name)
+    {
+      var view = new GameObject(name).AddComponent<View>();
+      view.componentPropertyBindings = new[]
+      {
+        new ComponentPropertyBinding
+        {
+          SourcePath = "Position", TargetComponent = view.transform, TargetPath = "localPosition",
+        },
+      };
+      view.containerPropertyBindings = new[]
+      {
+        new ContainerPropertyBinding { SourcePath = "Children" },
+      };
+      return view;
+    }
+
+    [Test]
+    public void EquivalentViewsShareWholePlansAcrossBranchesWithoutSharingInstances()
+    {
+      var first = CreatePlannedView("First branch");
+      var second = CreatePlannedView("Second branch");
+      try
+      {
+        var firstSource = new ViewModel { Position = Vector3.right };
+        var secondSource = new ViewModel { Position = Vector3.up };
+        first.DataSource = firstSource;
+        var layout = PrivateField(first, "bindingPlans");
+        var plan = PrivateField(layout, "lastPlan");
+        second.DataSource = secondSource;
+        Assert.AreSame(layout, PrivateField(second, "bindingPlans"));
+        Assert.AreSame(plan, PrivateField(layout, "lastPlan"));
+        Assert.AreSame(firstSource, first.containerPropertyBindings[0].DataSource);
+        Assert.AreSame(secondSource, second.containerPropertyBindings[0].DataSource);
+        Assert.AreEqual(Vector3.right, first.transform.localPosition);
+        Assert.AreEqual(Vector3.up, second.transform.localPosition);
+        first.DataSource = new ViewModel { Position = Vector3.forward };
+        Assert.AreSame(plan, PrivateField(layout, "lastPlan"));
+        Assert.AreEqual(Vector3.forward, first.transform.localPosition);
+        Assert.AreEqual(Vector3.up, second.transform.localPosition);
+      }
+      finally
+      {
+        UnityEngine.Object.DestroyImmediate(first.gameObject);
+        UnityEngine.Object.DestroyImmediate(second.gameObject);
+      }
+    }
+
+    [Test]
+    public void SharedLayoutsKeepEachViewsPathReferencesForWarmMatching()
+    {
+      var first = CreatePlannedView("First path instances");
+      var second = CreatePlannedView("Separate path instances");
+      try
+      {
+        second.componentPropertyBindings = new[]
+        {
+          new ComponentPropertyBinding
+          {
+            SourcePath = new string("Position".ToCharArray()),
+            TargetPath = new string("localPosition".ToCharArray()),
+            TargetComponent = second.transform,
+          },
+        };
+        second.containerPropertyBindings = new[]
+        {
+          new ContainerPropertyBinding { SourcePath = new string("Children".ToCharArray()) },
+        };
+        Assert.AreNotSame(first.componentPropertyBindings[0].SourcePath,
+          second.componentPropertyBindings[0].SourcePath);
+        first.DataSource = new ViewModel();
+        second.DataSource = new ViewModel { Position = Vector3.up };
+        Assert.AreSame(PrivateField(first, "bindingPlans"), PrivateField(second, "bindingPlans"));
+        var snapshot = PrivateField(second, "bindingLayout");
+        var sources = (string[])PrivateField(snapshot, "componentSources");
+        Assert.AreSame(second.componentPropertyBindings[0].SourcePath, sources[0]);
+        Assert.AreSame(second.componentPropertyBindings[0].TargetPath,
+          ((string[])PrivateField(snapshot, "componentTargets"))[0]);
+        Assert.AreSame(second.containerPropertyBindings[0].SourcePath,
+          ((string[])PrivateField(snapshot, "containerSources"))[0]);
+        second.DataSource = new ViewModel { Position = Vector3.forward };
+        Assert.AreSame(sources, PrivateField(PrivateField(second, "bindingLayout"), "componentSources"));
+        Assert.AreEqual(Vector3.forward, second.transform.localPosition);
+      }
+      finally
+      {
+        UnityEngine.Object.DestroyImmediate(first.gameObject);
+        UnityEngine.Object.DestroyImmediate(second.gameObject);
+      }
+    }
+
+    [Test]
+    public void LayoutSnapshotsRefreshAfterSerializedPathsAndSameLengthArraysChange()
+    {
+      var view = CreatePlannedView("Replaced paths");
+      try
+      {
+        view.DataSource = new ViewModel();
+        var layout = PrivateField(view, "bindingPlans");
+        var path = new string("Position".ToCharArray());
+        // Unity serialization bypasses property setters.
+        typeof(ComponentPropertyBinding).GetField("sourcePath",
+          BindingFlags.Instance | BindingFlags.NonPublic).SetValue(view.componentPropertyBindings[0], path);
+        var containerPath = new string("Children".ToCharArray());
+        typeof(ContainerPropertyBinding).GetField("sourcePath",
+          BindingFlags.Instance | BindingFlags.NonPublic).SetValue(view.containerPropertyBindings[0], containerPath);
+        view.DataSource = new ViewModel { Position = Vector3.right };
+        Assert.AreSame(layout, PrivateField(view, "bindingPlans"));
+        var snapshot = PrivateField(view, "bindingLayout");
+        Assert.AreSame(path, ((string[])PrivateField(snapshot, "componentSources"))[0]);
+        Assert.AreSame(containerPath, ((string[])PrivateField(snapshot, "containerSources"))[0]);
+        Assert.AreEqual(Vector3.right, view.transform.localPosition);
+
+        view.componentPropertyBindings = new[]
+        {
+          new ComponentPropertyBinding
+          {
+            SourcePath = "OtherPosition", TargetPath = "localScale", TargetComponent = view.transform,
+          },
+        };
+        view.DataSource = new ViewModel { OtherPosition = Vector3.one * 3 };
+        Assert.AreNotSame(layout, PrivateField(view, "bindingPlans"));
+        Assert.AreEqual(Vector3.one * 3, view.transform.localScale);
+      }
+      finally { UnityEngine.Object.DestroyImmediate(view.gameObject); }
+    }
+
+    [Test]
+    public void SeparateContainersApplyTheSamePlanToInstantiatedViews()
+    {
+      var template = CreatePlannedView("Shared template");
+      var roots = new View[2];
+      try
+      {
+        object sharedLayout = null;
+        for (var branch = 0; branch < roots.Length; ++branch)
+        {
+          var root = roots[branch] = new GameObject("Container branch " + branch).AddComponent<View>();
+          root.containerPropertyBindings = new[]
+          {
+            new ContainerPropertyBinding
+            {
+              SourcePath = "Children", TargetContainer = root.transform, ElementTemplate = template,
+            },
+          };
+          root.DataSource = new ViewModel
+          {
+            Children = new INotifyDataSourceChanged[]
+            {
+              new ViewModel { Position = Vector3.one * (branch + 1) },
+              new DerivedViewModel { Position = Vector3.up * (branch + 1) },
+            },
+          };
+          Assert.AreEqual(2, root.transform.childCount);
+          for (var child = 0; child < 2; ++child)
+          {
+            var childView = root.transform.GetChild(child).GetComponent<View>();
+            var layout = PrivateField(childView, "bindingPlans");
+            if (sharedLayout == null) sharedLayout = layout;
+            Assert.AreSame(sharedLayout, layout);
+            Assert.AreSame(childView.transform, childView.componentPropertyBindings[0].TargetComponent);
+            Assert.AreEqual((child == 0 ? Vector3.one : Vector3.up) * (branch + 1),
+              childView.transform.localPosition);
+          }
+        }
+      }
+      finally
+      {
+        foreach (var root in roots)
+        {
+          if (root == null) continue;
+          // Clear children explicitly before the root's OnDestroy removes them asynchronously.
+          while (root.transform.childCount > 0)
+            UnityEngine.Object.DestroyImmediate(root.transform.GetChild(0).gameObject);
+          UnityEngine.Object.DestroyImmediate(root.gameObject);
+        }
+        UnityEngine.Object.DestroyImmediate(template.gameObject);
+      }
+    }
+
+    [Test]
+    public void SharedPlansSelectExactRuntimeTypesAndReuseEarlierTypePlans()
+    {
+      var view = CreatePlannedView("Mixed types");
+      try
+      {
+        view.DataSource = new ViewModel { Position = Vector3.right };
+        var layout = PrivateField(view, "bindingPlans");
+        var basePlan = PrivateField(layout, "lastPlan");
+        view.DataSource = new DerivedViewModel { Position = Vector3.up };
+        Assert.AreEqual(Vector3.up, view.transform.localPosition);
+        Assert.AreNotSame(basePlan, PrivateField(layout, "lastPlan"));
+        view.DataSource = new ViewModel { Position = Vector3.forward };
+        Assert.AreSame(basePlan, PrivateField(layout, "lastPlan"));
+        Assert.AreEqual(Vector3.forward, view.transform.localPosition);
+        view.DataSource = null;
+        Assert.IsNull(view.componentPropertyBindings[0].DataSource);
+        Assert.IsNull(view.containerPropertyBindings[0].DataSource);
+        view.DataSource = new ViewModel { Position = Vector3.one };
+        Assert.AreSame(basePlan, PrivateField(layout, "lastPlan"));
+        Assert.AreEqual(Vector3.one, view.transform.localPosition);
+      }
+      finally { UnityEngine.Object.DestroyImmediate(view.gameObject); }
+    }
+
+    [Test]
+    public void SharedLayoutsInvalidateOnEditsAndBindingArrayReplacement()
+    {
+      var view = CreatePlannedView("Edited layout");
+      var otherTarget = new GameObject("Other target");
+      try
+      {
+        view.DataSource = new ViewModel { Position = Vector3.right };
+        var original = PrivateField(view, "bindingPlans");
+        view.componentPropertyBindings[0].SourcePath = "OtherPosition";
+        view.componentPropertyBindings[0].TargetPath = "localScale";
+        view.componentPropertyBindings[0].TargetComponent = otherTarget.transform;
+        view.DataSource = new ViewModel { OtherPosition = Vector3.one * 2 };
+        Assert.AreNotSame(original, PrivateField(view, "bindingPlans"));
+        Assert.AreEqual(Vector3.one * 2, otherTarget.transform.localScale);
+        view.componentPropertyBindings = Array.Empty<ComponentPropertyBinding>();
+        view.containerPropertyBindings = Array.Empty<ContainerPropertyBinding>();
+        view.DataSource = new ViewModel();
+        Assert.AreEqual(0, view.componentPropertyBindings.Length);
+      }
+      finally
+      {
+        UnityEngine.Object.DestroyImmediate(view.gameObject);
+        UnityEngine.Object.DestroyImmediate(otherTarget);
+      }
     }
 
     private static PropertyAccessorChain Getter(object source, string path) =>
@@ -211,6 +453,46 @@ namespace JH.DataBinding.Tests
       {
         UnityEngine.Object.DestroyImmediate(gameObject);
       }
+    }
+
+    [Test]
+    public void WarmViewPlansReportPerBindingLookupComparison()
+    {
+      const int iterations = 20000;
+      var view = CreatePlannedView("Plan benchmark");
+      try
+      {
+        var bindings = new ComponentPropertyBinding[8];
+        for (var i = 0; i < bindings.Length; ++i)
+          bindings[i] = new ComponentPropertyBinding
+          {
+            SourcePath = "Position", TargetComponent = view.transform, TargetPath = "localPosition",
+          };
+        view.componentPropertyBindings = bindings;
+        var first = new ViewModel { Position = Vector3.right };
+        var second = new ViewModel { Position = Vector3.up };
+        var bind = (Action<object>)typeof(View).GetMethod("BindBindingDataSources",
+          BindingFlags.Instance | BindingFlags.NonPublic).CreateDelegate(typeof(Action<object>), view);
+        bind(first);
+        bind(second);
+        var timer = Stopwatch.StartNew();
+        for (var i = 0; i < iterations; ++i) bind((i & 1) == 0 ? first : second);
+        timer.Stop();
+        var planMilliseconds = timer.Elapsed.TotalMilliseconds;
+        timer.Restart();
+        for (var i = 0; i < iterations; ++i)
+        {
+          var source = (i & 1) == 0 ? first : second;
+          foreach (var binding in bindings) binding.DataSource = source;
+          foreach (var binding in view.containerPropertyBindings) binding.DataSource = source;
+        }
+        timer.Stop();
+        TestContext.WriteLine($"{iterations} rebindings of 8 component + 1 container bindings: " +
+          $"shared view plan {planMilliseconds:F3} ms; per-binding caches " +
+          $"{timer.Elapsed.TotalMilliseconds:F3} ms (execution excluded).");
+        Assert.AreSame(second, bindings[0].DataSource);
+      }
+      finally { UnityEngine.Object.DestroyImmediate(view.gameObject); }
     }
 
     [Test]

@@ -54,6 +54,12 @@ Component and container bindings cache executable property paths built with
 getter and setter value types, avoiding intermediate boxing and setter argument arrays.
 Changing a binding resolves its new path at runtime; no binding source code is generated.
 
+Views also share complete binding plans by binding layout and exact source runtime type.
+Equivalent layouts share plans across templates and hierarchy branches. Reassigning a data
+source applies the existing chains and transfers directly, without per-binding accessor or
+transfer cache lookups. Binding path, target type, and binding array edits select a new layout;
+different source subclasses retain separate plans. Shared plans contain no bound instances.
+
 Mono, IL2CPP, and WebGL use the same executor. Fixed AOT references cover common primitive
 and Unity value types. Struct receivers and signatures that cannot create a delegate use
 cached reflection fallbacks. Numeric conversions retain the reflection binder's behavior.

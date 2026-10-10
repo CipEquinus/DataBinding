@@ -54,6 +54,12 @@ namespace JH.DataBinding
       set => elementTemplate = value;
     }
 
+    internal void ApplyPlan(object source, PropertyAccessorChain getter)
+    {
+      dataSource = source;
+      dataSourcePropertyAccessors = getter;
+    }
+
     private void BindSource()
     {
       if (dataSource != null && !String.IsNullOrEmpty(sourcePath))

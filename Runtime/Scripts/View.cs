@@ -19,6 +19,8 @@ namespace JH.DataBinding
       Array.Empty<ContainerPropertyBinding>();
 
     private INotifyDataSourceChanged dataSource;
+    private ViewBindingPlans bindingPlans;
+    private ViewBindingPlans.LayoutSnapshot bindingLayout;
 
     public virtual void OnEnable()
     {
@@ -96,15 +98,9 @@ namespace JH.DataBinding
 
     private void BindBindingDataSources(object bindingDataSource)
     {
-      foreach (var binding in componentPropertyBindings)
-      {
-        binding.DataSource = bindingDataSource;
-      }
-
-      foreach (var binding in containerPropertyBindings)
-      {
-        binding.DataSource = bindingDataSource;
-      }
+      if (bindingPlans == null || !bindingLayout.Matches(this))
+        bindingPlans = ViewBindingPlans.For(this, out bindingLayout);
+      bindingPlans.GetPlan(this, bindingDataSource).Apply(this, bindingDataSource);
     }
 
     private void UpdateBindings()

@@ -98,6 +98,15 @@ namespace JH.DataBinding
       }
     }
 
+    internal void ApplyPlan(object source, PropertyAccessorChain getter,
+      PropertyAccessorChain setter, Action<object, object> transfer)
+    {
+      dataSource = source;
+      dataSourcePropertyAccessors = getter;
+      targetPropertyAccessors = setter;
+      transferValue = transfer;
+    }
+
     private void BindSource()
     {
       if (dataSource != null && !String.IsNullOrEmpty(sourcePath))
