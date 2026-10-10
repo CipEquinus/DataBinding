@@ -47,12 +47,12 @@ namespace JH.DataBinding
     {
       if (type == null)
       {
-        return reflectionOperations.GetFriendlyName(type);
+        return ReflectionExtensions.GetFriendlyName(this, type);
       }
 
       if (!nameCache.TryGetValue(type, out var name))
       {
-        name = reflectionOperations.GetFriendlyName(type);
+        name = ReflectionExtensions.GetFriendlyName(this, type);
         nameCache[type] = name;
       }
 
@@ -61,7 +61,7 @@ namespace JH.DataBinding
 
     public IEnumerable<MethodInfo> ResolvePublicPropertyPath(object instance, string path, PathResolveOperation operation)
     {
-      return reflectionOperations.ResolvePublicPropertyPath(instance, path, operation);
+      return ReflectionExtensions.ResolvePublicPropertyPath(this, instance, path, operation);
     }
 
     public object InvokeGetAccessChain(MethodInfo[] accessors, object instance)

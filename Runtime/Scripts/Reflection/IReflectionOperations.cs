@@ -4,6 +4,12 @@ using System.Reflection;
 
 namespace JH.DataBinding
 {
+  public enum PathResolveOperation
+  {
+    GetValue,
+    SetValue,
+  }
+
   public interface IReflectionOperations
   {
     PropertyInfo FindProperty(Type type, string name);
